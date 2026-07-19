@@ -26,7 +26,6 @@ const getCookieConfig = () => ({
     sameSite: 'none' as const,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
-    domain: '.vercel.app',
 });
 
 // AUTH ROUTES
@@ -58,7 +57,6 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 app.post("/api/auth/sign-out", (_req, res) => {
     res.clearCookie('token', { 
         path: '/', 
-        domain: '.vercel.app', 
         secure: true, 
         sameSite: 'none' 
     });
