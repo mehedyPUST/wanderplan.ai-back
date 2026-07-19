@@ -18,19 +18,23 @@ app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
 
-// Auth routes (manual, no Better Auth)
+// Cookie config based on environment
+const getCookieConfig = () => ({
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+    domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+});
+
+// Auth routes
 app.post("/api/auth/sign-up/email", async (req, res) => {
     try {
         const { email, password, name } = req.body;
         const user = await registerUser(email, password, name);
         const { token } = await loginUser(email, password);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-            path: '/',
-        });
+        res.cookie('token', token, getCookieConfig());
         res.json({ user });
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -41,13 +45,7 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
     try {
         const { email, password } = req.body;
         const { token, user } = await loginUser(email, password);
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-            path: '/',
-        });
+        res.cookie('token', token, getCookieConfig());
         res.json({ user });
     } catch (err: any) {
         res.status(401).json({ message: err.message });
@@ -55,7 +53,10 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 });
 
 app.post("/api/auth/sign-out", (_req, res) => {
-    res.clearCookie('token', { path: '/' });
+    res.clearCookie('token', {
+        path: '/',
+        domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+    });
     res.json({ message: 'Logged out' });
 });
 
@@ -84,10 +85,12 @@ async function start() {
 
     const { default: aiRoutes } = await import("./routes/aiRoutes");
     app.use("/api/ai", aiRoutes);
+
     const { default: wishlistRoutes } = await import("./routes/wishlistRoutes");
     app.use("/api/wishlist", requireAuth, wishlistRoutes);
 
-    app.listen(5000, () => console.log("Server running on http://localhost:5000"));
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }
 start();
 
