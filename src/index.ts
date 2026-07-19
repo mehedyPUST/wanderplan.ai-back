@@ -20,14 +20,6 @@ app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
 
-const getCookieConfig = () => ({
-    httpOnly: true,
-    secure: true,
-    sameSite: 'none' as const,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-    path: '/',
-});
-
 // AUTH ROUTES
 app.post("/api/auth/sign-up/email", async (req, res) => {
     try {
@@ -35,7 +27,7 @@ app.post("/api/auth/sign-up/email", async (req, res) => {
         const { email, password, name } = req.body;
         const user = await registerUser(email, password, name);
         const { token } = await loginUser(email, password);
-        res.cookie('token', token, getCookieConfig());
+        res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
         res.json({ user });
     } catch (err: any) {
         res.status(400).json({ message: err.message });
@@ -47,7 +39,7 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
         await connectDB();
         const { email, password } = req.body;
         const { token, user } = await loginUser(email, password);
-        res.cookie('token', token, getCookieConfig());
+        res.setHeader('Set-Cookie', `token=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
         res.json({ user });
     } catch (err: any) {
         res.status(401).json({ message: err.message });
@@ -55,11 +47,7 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 });
 
 app.post("/api/auth/sign-out", (_req, res) => {
-    res.clearCookie('token', { 
-        path: '/', 
-        secure: true, 
-        sameSite: 'none' 
-    });
+    res.setHeader('Set-Cookie', `token=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0`);
     res.json({ message: 'Logged out' });
 });
 
