@@ -8,35 +8,30 @@ import { registerUser, loginUser } from "./auth";
 const app = express();
 
 app.set("trust proxy", 1);
-
 app.use(cors({
-    origin: [
-        'https://wanderplan-ai-front.vercel.app',
-        'http://localhost:3000'
-    ],
+    origin: ['https://wanderplan-ai-front.vercel.app', 'http://localhost:3000'],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     exposedHeaders: ['set-cookie'],
 }));
-
-
-
 app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
 
-// Cookie config based on environment
 const getCookieConfig = () => ({
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' as const : 'lax' as const,
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    secure: true,
+    sameSite: 'none' as const,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
-    domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
+    domain: '.vercel.app',
 });
 
-// Auth routes
+// AUTH ROUTES
 app.post("/api/auth/sign-up/email", async (req, res) => {
     try {
+        await connectDB();
         const { email, password, name } = req.body;
         const user = await registerUser(email, password, name);
         const { token } = await loginUser(email, password);
@@ -49,6 +44,7 @@ app.post("/api/auth/sign-up/email", async (req, res) => {
 
 app.post("/api/auth/sign-in/email", async (req, res) => {
     try {
+        await connectDB();
         const { email, password } = req.body;
         const { token, user } = await loginUser(email, password);
         res.cookie('token', token, getCookieConfig());
@@ -59,45 +55,70 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 });
 
 app.post("/api/auth/sign-out", (_req, res) => {
-    res.clearCookie('token', {
-        path: '/',
-        domain: process.env.NODE_ENV === 'production' ? process.env.COOKIE_DOMAIN : undefined,
-    });
+    res.clearCookie('token', { path: '/', domain: '.vercel.app', secure: true, sameSite: 'none' });
     res.json({ message: 'Logged out' });
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
-async function start() {
+// DESTINATIONS
+app.use("/api/destinations", async (req, res, next) => {
     await connectDB();
-    await ensureIndexes();
-
-    const { requireAuth } = await import("./middleware/authMiddleware");
-
     const { default: destinationRoutes } = await import("./routes/destinationRoutes");
-    app.use("/api/destinations", destinationRoutes);
+    destinationRoutes(req, res, next);
+});
 
+// USER PROFILE
+app.use("/api/user", async (req, res, next) => {
+    await connectDB();
+    const { requireAuth } = await import("./middleware/authMiddleware");
     const { default: userRoutes } = await import("./routes/userRoutes");
-    app.use("/api/user", requireAuth, userRoutes);
+    requireAuth(req, res, () => userRoutes(req, res, next));
+});
 
+// ITINERARIES
+app.use("/api/itineraries", async (req, res, next) => {
+    await connectDB();
+    const { requireAuth } = await import("./middleware/authMiddleware");
     const { default: itineraryRoutes } = await import("./routes/itineraryRoutes");
-    app.use("/api/itineraries", requireAuth, itineraryRoutes);
+    requireAuth(req, res, () => itineraryRoutes(req, res, next));
+});
 
+// UPLOAD
+app.use("/api/upload", async (req, res, next) => {
+    await connectDB();
+    const { requireAuth } = await import("./middleware/authMiddleware");
     const { default: uploadRoutes } = await import("./routes/uploadRoutes");
-    app.use("/api/upload", requireAuth, uploadRoutes);
+    requireAuth(req, res, () => uploadRoutes(req, res, next));
+});
 
+// REVIEWS
+app.use("/api/reviews", async (req, res, next) => {
+    await connectDB();
     const { default: reviewRoutes } = await import("./routes/reviewRoutes");
-    app.use("/api/reviews", reviewRoutes);
+    reviewRoutes(req, res, next);
+});
 
+// AI
+app.use("/api/ai", async (req, res, next) => {
     const { default: aiRoutes } = await import("./routes/aiRoutes");
-    app.use("/api/ai", aiRoutes);
+    aiRoutes(req, res, next);
+});
 
+// WISHLIST
+app.use("/api/wishlist", async (req, res, next) => {
+    await connectDB();
+    const { requireAuth } = await import("./middleware/authMiddleware");
     const { default: wishlistRoutes } = await import("./routes/wishlistRoutes");
-    app.use("/api/wishlist", requireAuth, wishlistRoutes);
+    requireAuth(req, res, () => wishlistRoutes(req, res, next));
+});
 
-    const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Local dev only
+if (process.env.NODE_ENV !== 'production') {
+    connectDB().then(() => {
+        ensureIndexes();
+        app.listen(5000, () => console.log("http://localhost:5000"));
+    });
 }
-start();
 
 export default app;
