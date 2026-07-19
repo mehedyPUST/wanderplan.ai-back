@@ -10,10 +10,16 @@ const app = express();
 app.set("trust proxy", 1);
 
 app.use(cors({
-    origin: process.env.FRONTEND_URL,
+    origin: [
+        'https://wanderplan-ai-front.vercel.app',
+        'http://localhost:3000'
+    ],
     credentials: true,
     exposedHeaders: ['set-cookie'],
 }));
+
+
+
 app.options("*", cors());
 app.use(express.json());
 app.use(cookieParser());
