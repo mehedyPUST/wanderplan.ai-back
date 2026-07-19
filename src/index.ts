@@ -8,6 +8,7 @@ import { registerUser, loginUser } from "./auth";
 const app = express();
 
 app.set("trust proxy", 1);
+
 app.use(cors({
     origin: ['https://wanderplan-ai-front.vercel.app', 'http://localhost:3000'],
     credentials: true,
@@ -55,7 +56,12 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 });
 
 app.post("/api/auth/sign-out", (_req, res) => {
-    res.clearCookie('token', { path: '/', domain: '.vercel.app', secure: true, sameSite: 'none' });
+    res.clearCookie('token', { 
+        path: '/', 
+        domain: '.vercel.app', 
+        secure: true, 
+        sameSite: 'none' 
+    });
     res.json({ message: 'Logged out' });
 });
 
