@@ -97,6 +97,12 @@ app.use("/api/ai", async (req, res, next) => {
     aiRoutes(req, res, next);
 });
 
+// CHAT
+app.use("/api/chat", async (req, res, next) => {
+    const { default: chatRoutes } = await import("./routes/chatRoutes");
+    chatRoutes(req, res, next);
+});
+
 // WISHLIST
 app.use("/api/wishlist", async (req, res, next) => {
     await connectDB();
