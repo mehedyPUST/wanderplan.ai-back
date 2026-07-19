@@ -84,6 +84,8 @@ async function start() {
 
     const { default: aiRoutes } = await import("./routes/aiRoutes");
     app.use("/api/ai", aiRoutes);
+    const { default: wishlistRoutes } = await import("./routes/wishlistRoutes");
+    app.use("/api/wishlist", requireAuth, wishlistRoutes);
 
     app.listen(5000, () => console.log("Server running on http://localhost:5000"));
 }

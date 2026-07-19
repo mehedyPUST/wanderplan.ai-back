@@ -1,33 +1,55 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
 
 export async function getRecommendations(
-    userPreferences: { budget: number; interests: string[]; travelStyle: string },
-    destinations: any[]
+    userPreferences: { budget: number; interests: string[]; travelStyle: string; country?: string; city?: string }
 ) {
-    const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        generationConfig: { temperature: 0.7 },
+    const locationContext = userPreferences.country
+        ? `in ${userPreferences.city ? userPreferences.city + ", " : ""}${userPreferences.country}`
+        : "anywhere in the world";
+
+    const prompt = `You are a world-class travel expert with deep knowledge of every country and city on Earth.
+
+A traveler wants destination recommendations ${locationContext}.
+
+Traveler Preferences:
+- Budget: $${userPreferences.budget}
+- Interests: ${userPreferences.interests.join(", ")}
+- Travel Style: ${userPreferences.travelStyle}
+
+Recommend exactly 5 REAL destinations that match these preferences. You must recommend actual, well-known destinations from around the world.
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "name": "City, Country",
+    "country": "Country Name",
+    "matchScore": 9.5,
+    "reason": "Detailed 2-3 sentence explanation of why this matches their preferences",
+    "budgetFit": "Specific comment about budget (e.g., 'Well within your budget with average daily cost of $150')",
+    "bestTime": "Best months to visit",
+    "highlights": ["Specific attraction 1", "Specific attraction 2", "Specific attraction 3"],
+    "tips": "One practical travel tip (visa, local custom, transport, etc.)"
+  }
+]
+
+Rules:
+- Each destination MUST be a real place
+- Match scores should vary (not all the same)
+- Budget recommendations must be realistic
+- Highlights must be specific, named attractions
+- Include diverse destinations (not all from the same region)
+- No markdown, no extra text, ONLY the JSON array`;
+
+    const completion = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.8,
+        max_tokens: 2000,
     });
 
-    const prompt = `
-You are a travel recommendation expert. Based on these user preferences, recommend up to 5 destinations from the list.
-User preferences: ${JSON.stringify(userPreferences)}
-Available destinations: ${JSON.stringify(destinations.map((d: any) => ({
-        name: d.name,
-        category: d.category,
-        priceRange: d.priceRange,
-        tags: d.tags,
-        rating: d.rating,
-    })))}
-
-Return ONLY a JSON array of objects with: name, reason, score (1-10). No markdown, no extra text.
-Example: [{"name": "Santorini", "reason": "Perfect beach destination", "score": 9.5}]
-`;
-
-    const result = await model.generateContent(prompt);
-    const text = result.response.text();
-    const cleanText = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleanText);
+    const text = completion.choices[0]?.message?.content || "[]";
+    const clean = text.replace(/```json|```/g, "").trim();
+    return JSON.parse(clean);
 }

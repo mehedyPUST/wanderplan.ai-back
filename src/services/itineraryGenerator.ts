@@ -1,6 +1,6 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import Groq from "groq-sdk";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY! });
 
 export async function* generateItineraryStream(params: {
     destination: string;
@@ -9,20 +9,17 @@ export async function* generateItineraryStream(params: {
     interests: string[];
     length: string;
 }) {
-    const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        generationConfig: { temperature: 0.9 },
+    const prompt = `Create a ${params.length} ${params.days}-day itinerary for ${params.destination}. Budget: $${params.budget}. Interests: ${params.interests.join(", ")}.`;
+
+    const stream = await groq.chat.completions.create({
+        model: "llama-3.3-70b-versatile",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.9,
+        stream: true,
     });
 
-    const prompt = `Create a ${params.length} day-by-day itinerary for a trip to ${params.destination}.
-Duration: ${params.days} days
-Budget: $${params.budget}
-Interests: ${params.interests.join(", ")}
-Output style: ${params.length === "detailed" ? "Detailed with activities, tips, and estimated costs" : "Concise overview with highlights"}.`;
-
-    const stream = await model.generateContentStream(prompt);
-    for await (const chunk of stream.stream) {
-        const text = chunk.text();
+    for await (const chunk of stream) {
+        const text = chunk.choices[0]?.delta?.content;
         if (text) yield text;
     }
 }
