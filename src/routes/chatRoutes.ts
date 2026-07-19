@@ -28,8 +28,9 @@ router.post("/", async (req: Request, res: Response) => {
 
         res.write("data: [DONE]\n\n");
         res.end();
-    } catch (error) {
-        res.write(`data: ${JSON.stringify({ error: "Chat failed" })}\n\n`);
+    } catch (error: any) {
+        console.error("CHAT ERROR:", error.message, error.status);
+        res.write(`data: ${JSON.stringify({ error: error.message || "Chat failed" })}\n\n`);
         res.end();
     }
 });
