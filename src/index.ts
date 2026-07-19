@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { connectDB, ensureIndexes } from "./db";
-import { registerUser, loginUser } from "./auth";
+import { registerUser, loginUser, verifyGoogleToken, googleLogin, generateToken } from "./auth";
 
 const app = express();
 
@@ -49,6 +49,37 @@ app.post("/api/auth/sign-in/email", async (req, res) => {
 app.post("/api/auth/sign-out", (_req, res) => {
     res.setHeader('Set-Cookie', `token=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0`);
     res.json({ message: 'Logged out' });
+});
+
+// Google OAuth
+app.post("/api/auth/google", async (req, res) => {
+    try {
+        await connectDB();
+        const { token } = req.body;
+
+        if (!token) {
+            return res.status(400).json({ message: "Google token required" });
+        }
+
+        const payload = await verifyGoogleToken(token);
+        if (!payload || !payload.email) {
+            return res.status(400).json({ message: "Invalid Google token" });
+        }
+
+        const user = await googleLogin(
+            payload.email,
+            payload.name || 'Traveler',
+            payload.picture
+        );
+
+        const jwtToken = generateToken(user.id);
+
+        res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+        res.json({ user });
+    } catch (err: any) {
+        console.error("Google login error:", err.message);
+        res.status(401).json({ message: "Google login failed" });
+    }
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
