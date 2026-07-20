@@ -52,7 +52,43 @@ router.get("/user", async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/itineraries/:id — Get single itinerary
+// GET /api/itineraries/expenses — Get expense data for charts
+router.get("/expenses", async (req: Request, res: Response) => {
+    try {
+        const db = getDb();
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const expenses = await db.collection("itineraries").aggregate([
+            { $match: { userId: new ObjectId((req as any).user._id), travelled: true, travelledAt: { $gte: sixMonthsAgo } } },
+            { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$travelledAt" } }, total: { $sum: "$budget" } } },
+            { $sort: { _id: 1 } }
+        ]).toArray();
+
+        res.json(expenses);
+    } catch (error) {
+        console.error("Get expenses error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// PATCH /api/itineraries/:id/travel — Mark as travelled
+router.patch("/:id/travel", async (req: Request, res: Response) => {
+    try {
+        const user = (req as any).user;
+        const db = getDb();
+        await db.collection("itineraries").updateOne(
+            { _id: new ObjectId(req.params.id), userId: new ObjectId(user._id) },
+            { $set: { travelled: true, travelledAt: new Date() } }
+        );
+        res.json({ message: "Marked as travelled" });
+    } catch (error) {
+        console.error("Mark travelled error:", error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// GET /api/itineraries/:id — Get single itinerary (MUST BE AFTER static routes)
 router.get("/:id", async (req: Request, res: Response) => {
     try {
         const user = (req as any).user;
@@ -101,42 +137,6 @@ router.put("/:id", async (req: Request, res: Response) => {
         res.status(500).json({ message: "Server error" });
     }
 });
-
-
-// PATCH /api/itineraries/:id/travel — Mark as travelled
-router.patch("/:id/travel", async (req: Request, res: Response) => {
-    try {
-        const db = getDb();
-        await db.collection("itineraries").updateOne(
-            { _id: new ObjectId(req.params.id), userId: new ObjectId((req as any).user._id) },
-            { $set: { travelled: true, travelledAt: new Date() } }
-        );
-        res.json({ message: "Marked as travelled" });
-    } catch {
-        res.status(500).json({ message: "Server error" });
-    }
-});
-
-// GET /api/user/expenses — Get expense data for charts
-router.get("/expenses", async (req: Request, res: Response) => {
-    try {
-        const db = getDb();
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-        const expenses = await db.collection("itineraries").aggregate([
-            { $match: { userId: new ObjectId((req as any).user._id), travelled: true, travelledAt: { $gte: sixMonthsAgo } } },
-            { $group: { _id: { $dateToString: { format: "%Y-%m", date: "$travelledAt" } }, total: { $sum: "$budget" } } },
-            { $sort: { _id: 1 } }
-        ]).toArray();
-
-        res.json(expenses);
-    } catch {
-        res.status(500).json({ message: "Server error" });
-    }
-});
-
-
 
 // DELETE /api/itineraries/:id — Delete itinerary
 router.delete("/:id", async (req: Request, res: Response) => {
