@@ -84,13 +84,17 @@ app.post("/api/auth/google", async (req, res) => {
 
 
 // Google OAuth Redirect
-app.get("/api/auth/google/redirect", (_req, res) => {
+// Google OAuth Redirect
+app.get("/api/auth/google/redirect", (req, res) => {
+    const returnUrl = (req.query.returnUrl as string) || "/";
+
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${process.env.GOOGLE_CLIENT_ID}` +
-        `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback` +
+        `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback?returnUrl=${encodeURIComponent(returnUrl)}` +
         `&response_type=code` +
         `&scope=email%20profile` +
-        `&access_type=offline`;
+        `&access_type=offline` +
+        `&state=${encodeURIComponent(returnUrl)}`;
 
     res.redirect(googleAuthUrl);
 });
