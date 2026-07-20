@@ -12,7 +12,7 @@ app.set("trust proxy", 1);
 app.use(cors({
     origin: ['https://wanderplan-ai-front.vercel.app', 'http://localhost:3000'],
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     exposedHeaders: ['set-cookie'],
 }));
@@ -52,7 +52,6 @@ app.post("/api/auth/sign-out", (_req, res) => {
 });
 
 // Google OAuth Redirect
-// Google OAuth Redirect
 app.get("/api/auth/google/redirect", (req, res) => {
     const returnUrl = (req.query.returnUrl as string) || "/";
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -85,6 +84,10 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
         const tokens: any = await tokenResponse.json();
 
+        if (tokens.error) {
+            return res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+        }
+
         const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
@@ -94,9 +97,10 @@ app.get("/api/auth/google/callback", async (req, res) => {
         const jwtToken = generateToken(user.id);
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
-        res.json({ success: true, returnUrl });
+        res.redirect(`${process.env.FRONTEND_URL}${returnUrl}`);
     } catch (err: any) {
-        res.status(401).json({ error: "Google login failed" });
+        console.error("Google callback error:", err.message);
+        res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
     }
 });
 
