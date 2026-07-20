@@ -82,6 +82,55 @@ app.post("/api/auth/google", async (req, res) => {
     }
 });
 
+
+// Google OAuth Redirect
+app.get("/api/auth/google/redirect", (_req, res) => {
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${process.env.GOOGLE_CLIENT_ID}` +
+        `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback` +
+        `&response_type=code` +
+        `&scope=email%20profile` +
+        `&access_type=offline`;
+
+    res.redirect(googleAuthUrl);
+});
+
+// Google OAuth Callback
+app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+        const { code } = req.query;
+
+        const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                code,
+                client_id: process.env.GOOGLE_CLIENT_ID,
+                client_secret: process.env.GOOGLE_CLIENT_SECRET,
+                redirect_uri: `${process.env.FRONTEND_URL}/auth/google/callback`,
+                grant_type: "authorization_code",
+            }),
+        });
+
+        const tokens: any = await tokenResponse.json();
+
+        const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+
+        const userInfo = await userResponse.json();
+
+        const user = await googleLogin(userInfo.email, userInfo.name, userInfo.picture);
+        const jwtToken = generateToken(user.id);
+
+        res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+        res.json({ user });
+    } catch (err: any) {
+        res.status(401).json({ message: "Google login failed" });
+    }
+});
+
+
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 // DESTINATIONS
