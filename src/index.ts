@@ -51,29 +51,16 @@ app.post("/api/auth/sign-out", (_req, res) => {
     res.json({ message: 'Logged out' });
 });
 
-// Google OAuth
+// Google OAuth (One Tap)
 app.post("/api/auth/google", async (req, res) => {
     try {
         await connectDB();
         const { token } = req.body;
-
-        if (!token) {
-            return res.status(400).json({ message: "Google token required" });
-        }
-
+        if (!token) return res.status(400).json({ message: "Google token required" });
         const payload = await verifyGoogleToken(token);
-        if (!payload || !payload.email) {
-            return res.status(400).json({ message: "Invalid Google token" });
-        }
-
-        const user = await googleLogin(
-            payload.email,
-            payload.name || 'Traveler',
-            payload.picture
-        );
-
+        if (!payload || !payload.email) return res.status(400).json({ message: "Invalid Google token" });
+        const user = await googleLogin(payload.email, payload.name || 'Traveler', payload.picture);
         const jwtToken = generateToken(user.id);
-
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
         res.json({ user });
     } catch (err: any) {
@@ -82,27 +69,24 @@ app.post("/api/auth/google", async (req, res) => {
     }
 });
 
-
-// Google OAuth Redirect
-// Google OAuth Redirect
+// Google OAuth Redirect (state parameter - no query string in redirect_uri)
 app.get("/api/auth/google/redirect", (req, res) => {
     const returnUrl = (req.query.returnUrl as string) || "/";
-
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${process.env.GOOGLE_CLIENT_ID}` +
-        `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback?returnUrl=${encodeURIComponent(returnUrl)}` +
+        `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback` +
         `&response_type=code` +
         `&scope=email%20profile` +
         `&access_type=offline` +
         `&state=${encodeURIComponent(returnUrl)}`;
-
     res.redirect(googleAuthUrl);
 });
 
 // Google OAuth Callback
 app.get("/api/auth/google/callback", async (req, res) => {
     try {
-        const { code } = req.query;
+        const { code, state } = req.query;
+        const returnUrl = (state as string) || "/";
 
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
@@ -117,23 +101,20 @@ app.get("/api/auth/google/callback", async (req, res) => {
         });
 
         const tokens: any = await tokenResponse.json();
-
         const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 
         const userInfo = await userResponse.json();
-
         const user = await googleLogin(userInfo.email, userInfo.name, userInfo.picture);
         const jwtToken = generateToken(user.id);
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
-        res.json({ user });
+        res.redirect(`${process.env.FRONTEND_URL}${returnUrl}`);
     } catch (err: any) {
-        res.status(401).json({ message: "Google login failed" });
+        res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
     }
 });
-
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
