@@ -4,7 +4,6 @@ import { generateFeaturedDestinations } from "../services/featuredService";
 
 const router = Router();
 
-// Real working images by category
 function getImageForCategory(category: string): string {
     const images: Record<string, string> = {
         beach: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&h=400&fit=crop",
@@ -15,7 +14,6 @@ function getImageForCategory(category: string): string {
     };
     return images[category] || images.default;
 }
-
 // GET /api/featured
 router.get("/", async (_req: Request, res: Response) => {
     try {
@@ -25,7 +23,8 @@ router.get("/", async (_req: Request, res: Response) => {
         if (!featured || !featured.nextRefresh || new Date() > new Date(featured.nextRefresh)) {
             try {
                 let destinations = await generateFeaturedDestinations();
-                // Fix images with real working URLs
+
+                // ✅ FORCE replace ALL image URLs with working ones
                 destinations = destinations.map((dest: any) => ({
                     ...dest,
                     image: getImageForCategory(dest.category || 'default')
@@ -45,56 +44,32 @@ router.get("/", async (_req: Request, res: Response) => {
                 return res.json(destinations);
             } catch (aiError) {
                 console.error("AI featured failed:", aiError);
-                if (featured?.destinations) return res.json(featured.destinations);
+                if (featured?.destinations) {
+                    // ✅ Fix images in cached data too
+                    const fixed = featured.destinations.map((dest: any) => ({
+                        ...dest,
+                        image: getImageForCategory(dest.category || 'default')
+                    }));
+                    return res.json(fixed);
+                }
             }
         } else {
-            return res.json(featured.destinations);
+            // ✅ Fix images in existing data too
+            const fixed = featured.destinations.map((dest: any) => ({
+                ...dest,
+                image: getImageForCategory(dest.category || 'default')
+            }));
+            return res.json(fixed);
         }
 
-        // Fallback data
+        // Fallback
         const fallback = [
-            {
-                name: "Bali, Indonesia", slug: "bali-indonesia", country: "Indonesia",
-                image: getImageForCategory("beach"),
-                shortDescription: "Tropical paradise with stunning beaches and rich culture.",
-                priceRange: { min: 500, max: 1500 }, rating: 4.7, category: "beach",
-                tags: ["beach", "culture"], reason: "Perfect weather this season"
-            },
-            {
-                name: "Paris, France", slug: "paris-france", country: "France",
-                image: getImageForCategory("city"),
-                shortDescription: "The City of Light — romance, art, and cuisine.",
-                priceRange: { min: 1000, max: 3000 }, rating: 4.8, category: "city",
-                tags: ["romantic", "culture"], reason: "Summer festivals in full swing"
-            },
-            {
-                name: "Tokyo, Japan", slug: "tokyo-japan", country: "Japan",
-                image: getImageForCategory("city"),
-                shortDescription: "Ultramodern metropolis with ancient temples.",
-                priceRange: { min: 800, max: 2500 }, rating: 4.9, category: "city",
-                tags: ["city", "food"], reason: "Cherry blossom season approaching"
-            },
-            {
-                name: "Santorini, Greece", slug: "santorini-greece", country: "Greece",
-                image: getImageForCategory("beach"),
-                shortDescription: "Iconic blue-domed churches and breathtaking sunsets.",
-                priceRange: { min: 800, max: 2500 }, rating: 4.8, category: "beach",
-                tags: ["beach", "romantic"], reason: "Best sunsets of the year"
-            },
-            {
-                name: "Swiss Alps", slug: "swiss-alps", country: "Switzerland",
-                image: getImageForCategory("mountain"),
-                shortDescription: "Majestic peaks and world-class skiing.",
-                priceRange: { min: 1500, max: 5000 }, rating: 4.9, category: "mountain",
-                tags: ["mountain", "adventure"], reason: "Peak skiing season"
-            },
-            {
-                name: "Maldives", slug: "maldives", country: "Maldives",
-                image: getImageForCategory("beach"),
-                shortDescription: "Overwater villas and crystal clear waters.",
-                priceRange: { min: 2000, max: 5000 }, rating: 4.9, category: "beach",
-                tags: ["beach", "luxury"], reason: "Dry season with perfect weather"
-            }
+            { name: "Bali, Indonesia", slug: "bali-indonesia", country: "Indonesia", category: "beach", image: getImageForCategory("beach"), shortDescription: "Tropical paradise with stunning beaches.", priceRange: { min: 500, max: 1500 }, rating: 4.7, tags: ["beach"], reason: "Perfect weather this season" },
+            { name: "Paris, France", slug: "paris-france", country: "France", category: "city", image: getImageForCategory("city"), shortDescription: "The City of Light.", priceRange: { min: 1000, max: 3000 }, rating: 4.8, tags: ["culture"], reason: "Summer festivals" },
+            { name: "Tokyo, Japan", slug: "tokyo-japan", country: "Japan", category: "city", image: getImageForCategory("city"), shortDescription: "Ultramodern metropolis.", priceRange: { min: 800, max: 2500 }, rating: 4.9, tags: ["food"], reason: "Cherry blossom season" },
+            { name: "Santorini, Greece", slug: "santorini-greece", country: "Greece", category: "beach", image: getImageForCategory("beach"), shortDescription: "Iconic blue-domed churches.", priceRange: { min: 800, max: 2500 }, rating: 4.8, tags: ["romantic"], reason: "Best sunsets" },
+            { name: "Swiss Alps", slug: "swiss-alps", country: "Switzerland", category: "mountain", image: getImageForCategory("mountain"), shortDescription: "Majestic peaks.", priceRange: { min: 1500, max: 5000 }, rating: 4.9, tags: ["adventure"], reason: "Peak skiing season" },
+            { name: "Maldives", slug: "maldives", country: "Maldives", category: "beach", image: getImageForCategory("beach"), shortDescription: "Overwater villas.", priceRange: { min: 2000, max: 5000 }, rating: 4.9, tags: ["luxury"], reason: "Dry season" }
         ];
 
         res.json(fallback);
@@ -108,6 +83,7 @@ router.post("/refresh", async (_req: Request, res: Response) => {
     try {
         const db = getDb();
         let destinations = await generateFeaturedDestinations();
+
         destinations = destinations.map((dest: any) => ({
             ...dest,
             image: getImageForCategory(dest.category || 'default')
