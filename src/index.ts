@@ -86,6 +86,8 @@ app.get("/api/auth/google/redirect", (req, res) => {
 app.get("/api/auth/google/callback", async (req, res) => {
     try {
         const { code, state } = req.query;
+        console.log("Google callback received - code:", code ? "yes" : "no", "state:", state);
+
         const returnUrl = (state as string) || "/";
 
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -101,21 +103,30 @@ app.get("/api/auth/google/callback", async (req, res) => {
         });
 
         const tokens: any = await tokenResponse.json();
+        console.log("Token response:", tokens.error || "success");
+
+        if (tokens.error) {
+            console.error("Token error:", tokens.error_description);
+            return res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+        }
+
         const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
 
         const userInfo = await userResponse.json();
+        console.log("User info received for:", userInfo.email);
+
         const user = await googleLogin(userInfo.email, userInfo.name, userInfo.picture);
         const jwtToken = generateToken(user.id);
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
         res.redirect(`${process.env.FRONTEND_URL}${returnUrl}`);
     } catch (err: any) {
+        console.error("Google callback error:", err.message);
         res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
     }
 });
-
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 // DESTINATIONS
