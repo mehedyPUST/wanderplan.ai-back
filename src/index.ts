@@ -52,20 +52,24 @@ app.post("/api/auth/sign-out", (_req, res) => {
 });
 
 // Google OAuth Redirect
+// Google OAuth Redirect
 app.get("/api/auth/google/redirect", (req, res) => {
+    const returnUrl = (req.query.returnUrl as string) || "/";
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${process.env.GOOGLE_CLIENT_ID}` +
         `&redirect_uri=${process.env.FRONTEND_URL}/auth/google/callback` +
         `&response_type=code` +
         `&scope=email%20profile` +
-        `&access_type=offline`;
+        `&access_type=offline` +
+        `&state=${encodeURIComponent(returnUrl)}`;
     res.redirect(googleAuthUrl);
 });
 
 // Google OAuth Callback
 app.get("/api/auth/google/callback", async (req, res) => {
     try {
-        const { code } = req.query;
+        const { code, state } = req.query;
+        const returnUrl = (state as string) || "/";
 
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
@@ -84,16 +88,15 @@ app.get("/api/auth/google/callback", async (req, res) => {
         const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
             headers: { Authorization: `Bearer ${tokens.access_token}` },
         });
-        const userInfo = await userResponse.json();
+        const userInfo: any = await userResponse.json();
 
         const user = await googleLogin(userInfo.email, userInfo.name, userInfo.picture);
         const jwtToken = generateToken(user.id);
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
-        res.redirect(`${process.env.FRONTEND_URL}/auth/google/callback?token=${jwtToken}`);
+        res.json({ success: true, returnUrl });
     } catch (err: any) {
-        console.error("Google callback error:", err.message);
-        res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+        res.status(401).json({ error: "Google login failed" });
     }
 });
 
