@@ -85,6 +85,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
         const tokens: any = await tokenResponse.json();
 
         if (tokens.error) {
+            console.error("Token error:", tokens.error_description);
             return res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
         }
 
@@ -97,13 +98,14 @@ app.get("/api/auth/google/callback", async (req, res) => {
         const jwtToken = generateToken(user.id);
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+
+        // Redirect to home with success
         res.redirect(`${process.env.FRONTEND_URL}${returnUrl}`);
     } catch (err: any) {
         console.error("Google callback error:", err.message);
         res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
     }
 });
-
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 
 // DESTINATIONS
