@@ -142,6 +142,13 @@ app.use("/api/wishlist", async (req, res, next) => {
     requireAuth(req, res, () => wishlistRoutes(req, res, next));
 });
 
+// FEATURED
+app.use("/api/featured", async (req, res, next) => {
+    await connectDB();
+    const { default: featuredRoutes } = await import("./routes/featuredRoutes");
+    featuredRoutes(req, res, next);
+});
+
 // Local dev only
 if (process.env.NODE_ENV !== 'production') {
     connectDB().then(() => {
