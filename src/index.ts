@@ -67,8 +67,7 @@ app.get("/api/auth/google/redirect", (req, res) => {
 // Google OAuth Callback
 app.get("/api/auth/google/callback", async (req, res) => {
     try {
-        const { code, state } = req.query;
-        const returnUrl = (state as string) || "/";
+        const { code } = req.query;
 
         const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",
@@ -77,7 +76,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
                 code,
                 client_id: process.env.GOOGLE_CLIENT_ID,
                 client_secret: process.env.GOOGLE_CLIENT_SECRET,
-                redirect_uri: `${process.env.FRONTEND_URL}/auth/google/callback`,
+                redirect_uri: "https://wanderplan-ai-front.vercel.app/auth/google/callback",
                 grant_type: "authorization_code",
             }),
         });
@@ -86,7 +85,7 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
         if (tokens.error) {
             console.error("Token error:", tokens.error_description);
-            return res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+            return res.redirect("https://wanderplan-ai-front.vercel.app/login?error=google");
         }
 
         const userResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
@@ -99,11 +98,11 @@ app.get("/api/auth/google/callback", async (req, res) => {
 
         res.setHeader('Set-Cookie', `token=${jwtToken}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
 
-        // Redirect to home with success
-        res.redirect(`${process.env.FRONTEND_URL}${returnUrl}`);
+        // সরাসরি home-এ redirect
+        res.redirect("https://wanderplan-ai-front.vercel.app/");
     } catch (err: any) {
         console.error("Google callback error:", err.message);
-        res.redirect(`${process.env.FRONTEND_URL}/login?error=google`);
+        res.redirect("https://wanderplan-ai-front.vercel.app/login?error=google");
     }
 });
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
